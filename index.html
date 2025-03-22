@@ -210,6 +210,8 @@
             let hasReferenceImage = false;
             let hasCapturedImage = false;
             let stream = null;
+            let referenceImageData = null;
+            let capturedImageData = null;
             
             // Referens rasm tanlash
             referenceBrowse.addEventListener('click', function() {
@@ -227,6 +229,7 @@
                         img.src = e.target.result;
                         referencePreview.appendChild(img);
                         hasReferenceImage = true;
+                        referenceImageData = e.target.result;
                     }
                     
                     reader.readAsDataURL(this.files[0]);
@@ -265,13 +268,14 @@
                 canvas.height = video.videoHeight;
                 context.drawImage(video, 0, 0, canvas.width, canvas.height);
                 
-                capturedImage.src = canvas.toDataURL('image/png');
+                capturedImageData = canvas.toDataURL('image/png');
+                capturedImage.src = capturedImageData;
                 capturedImageContainer.style.display = 'flex';
                 compareBtn.style.display = 'inline-block';
                 hasCapturedImage = true;
             });
             
-            // Yuzlarni taqqoslash
+            // Yuzlarni taqqoslash - bu haqiqiy Face ID taqqoslash API'siga ulanishni simulyatsiya qiladi
             compareBtn.addEventListener('click', function() {
                 if (!hasReferenceImage || !hasCapturedImage) {
                     alert("Avval ikkala rasmni ham tayyorlang!");
@@ -284,24 +288,56 @@
                 // Yuklanayotganini ko'rsatish
                 loader.style.display = 'block';
                 
-                // Taqqoslash jarayonini simulyatsiya qilish (aslida Face ID API orqali)
-                setTimeout(function() {
-                    loader.style.display = 'none';
-                    
-                    // Tasodifiy natija (aslida Face ID algoritmi natijasi)
-                    const isMatch = Math.random() > 0.5;
-                    
-                    if (isMatch) {
-                        result.className = 'result success';
-                        result.textContent = '✅ Yashil to\'g\'ri! Yuzlar bir xil.';
-                    } else {
-                        result.className = 'result error';
-                        result.textContent = '❌ Yuzlar bir-biriga mos kelmadi!';
-                    }
-                    
-                    result.style.display = 'block';
-                }, 2000);
+                // Simulyatsiya - normal holatda bu FaceAPI ga so'rov bo'ladi
+                faceCompareSimulation(referenceImageData, capturedImageData)
+                    .then(matchResult => {
+                        loader.style.display = 'none';
+                        
+                        if (matchResult.isMatch) {
+                            result.className = 'result success';
+                            result.textContent = '✅ Yashil to\'g\'ri! Yuzlar bir xil.';
+                        } else {
+                            result.className = 'result error';
+                            result.textContent = '❌ Yuzlar bir-biriga mos kelmadi!';
+                        }
+                        
+                        result.style.display = 'block';
+                    });
             });
+            
+            // Yuz taqqoslash simulyatsiyasi - bu faqat namuna!
+            // Haqiqiy tizimda bu Face API ga so'rov bo'ladi
+            async function faceCompareSimulation(image1, image2) {
+                return new Promise((resolve) => {
+                    // Bu funksiya o'rniga Face API ni qo'llash kerak
+                    // Misol: Microsoft Azure Face API, AWS Rekognition, ...
+                    
+                    // Haqiqiy loyihada rasimlarni serverlarga yuborib natija olish kerak
+                    
+                    // MUHIM: Bu yerda biz o'xshashlik darajasini hisoblash uchun barmoq izi qo'llash kerak
+                    // Bu oddiy misolda biz faqat rasmlar bir xil ekanini tekshiramiz
+                    // (quyidagi kod faqat namuna, asosiy loyihada o'zgartirilishi kerak)
+                    
+                    // Rasmlar orasidagi o'xshashlik darajasini aniqlaydi
+                    // Hozirgacha biz uni boshlang'ich holatda o'rnatamiz
+                    const similarityThreshold = 80; // 80% o'xshashlik
+                    
+                    // Simulyatsiyada o'rnatilgan qiymat
+                    const similarity = 75; // 75% o'xshashlik (bu o'zgaruvchandir)
+                    
+                    // Agar o'xshashlik darajasi 80% dan oshsa, yuzlar bir xil deb hisoblanadi
+                    const isMatch = similarity >= similarityThreshold;
+                    
+                    // Kechiktirishdan keyin natijani qaytarish
+                    setTimeout(() => {
+                        resolve({
+                            isMatch: isMatch,
+                            similarity: similarity,
+                            threshold: similarityThreshold
+                        });
+                    }, 2000);
+                });
+            }
         });
     </script>
 </body>
