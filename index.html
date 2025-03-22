@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Face ID Skaner</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f5f5f5;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+        }
+        
+        .container {
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            padding: 20px;
+            width: 100%;
+            max-width: 600px;
+        }
+        
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        
+        .upload-section {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        
+        .image-preview {
+            width: 100%;
+            height: 200px;
+            border: 2px dashed #ccc;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            position: relative;
+        }
+        
+        .image-preview img {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+        }
+        
+        .upload-btn {
+            padding: 10px 20px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-top: 5px;
+            font-size: 16px;
+        }
+        
+        .scan-section {
+            margin-top: 30px;
+            text-align: center;
+        }
+        
+        #video {
+            width: 100%;
+            height: 300px;
+            background-color: #000;
+            margin-bottom: 10px;
+            border-radius: 8px;
+        }
+        
+        #capture-btn {
+            padding: 10px 20px;
+            background-color: #2196F3;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            margin-bottom: 20px;
+        }
+        
+        #compare-btn {
+            padding: 12px 24px;
+            background-color: #FF5722;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 18px;
+            margin-top: 10px;
+            display: none;
+        }
+        
+        #canvas {
+            display: none;
+        }
+        
+        .captured-image {
+            width: 100%;
+            height: 200px;
+            border: 2px solid #ccc;
+            margin: 10px auto;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+        }
+        
+        .captured-image img {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+        }
+        
+        .result {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 4px;
+            text-align: center;
+            font-weight: bold;
+            font-size: 20px;
+            display: none;
+        }
+        
+        .success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        
+        .error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        
+        .loader {
+            border: 6px solid #f3f3f3;
+            border-top: 6px solid #3498db;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 2s linear infinite;
+            margin: 20px auto;
+            display: none;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Face ID Skaner</h1>
+        
+        <!-- Referens rasm yuklash -->
+        <div class="upload-section">
+            <h2>Referens rasmni yuklang</h2>
+            <div class="image-preview" id="referencePreview">
+                <p>Rasmni tanlang</p>
+            </div>
+            <input type="file" id="referenceInput" accept="image/*" hidden>
+            <button class="upload-btn" id="referenceBrowse">Rasmni yuklash</button>
+        </div>
+        
+        <!-- Kamera skaner qismi -->
+        <div class="scan-section">
+            <h2>Yuzni skanerlash</h2>
+            <video id="video" autoplay playsinline></video>
+            <button id="capture-btn">Rasmga olish</button>
+            
+            <div class="captured-image" id="capturedImageContainer">
+                <img id="capturedImage" alt="Skanerlangan yuz">
+            </div>
+            
+            <canvas id="canvas"></canvas>
+            
+            <button id="compare-btn">Yuzlarni taqqoslash</button>
+        </div>
+        
+        <div class="loader" id="loader"></div>
+        
+        <div class="result" id="result"></div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const referenceInput = document.getElementById('referenceInput');
+            const referenceBrowse = document.getElementById('referenceBrowse');
+            const referencePreview = document.getElementById('referencePreview');
+            const video = document.getElementById('video');
+            const captureBtn = document.getElementById('capture-btn');
+            const canvas = document.getElementById('canvas');
+            const capturedImageContainer = document.getElementById('capturedImageContainer');
+            const capturedImage = document.getElementById('capturedImage');
+            const compareBtn = document.getElementById('compare-btn');
+            const loader = document.getElementById('loader');
+            const result = document.getElementById('result');
+            
+            let hasReferenceImage = false;
+            let hasCapturedImage = false;
+            let stream = null;
+            
+            // Referens rasm tanlash
+            referenceBrowse.addEventListener('click', function() {
+                referenceInput.click();
+            });
+            
+            // Referens rasm previyusi
+            referenceInput.addEventListener('change', function() {
+                if (this.files && this.files[0]) {
+                    const reader = new FileReader();
+                    
+                    reader.onload = function(e) {
+                        referencePreview.innerHTML = '';
+                        const img = document.createElement('img');
+                        img.src = e.target.result;
+                        referencePreview.appendChild(img);
+                        hasReferenceImage = true;
+                    }
+                    
+                    reader.readAsDataURL(this.files[0]);
+                }
+            });
+            
+            // Kamerani yoqish
+            async function startCamera() {
+                try {
+                    stream = await navigator.mediaDevices.getUserMedia({ 
+                        video: { 
+                            facingMode: "user",
+                            width: { ideal: 640 },
+                            height: { ideal: 480 }
+                        }
+                    });
+                    video.srcObject = stream;
+                } catch (err) {
+                    console.error("Kamerani ishga tushirishda xatolik:", err);
+                    alert("Kameraga ruxsat berilmadi yoki kamera mavjud emas.");
+                }
+            }
+            
+            // Sahifa yuklanganda kamerani yoqish
+            startCamera();
+            
+            // Rasmga olish
+            captureBtn.addEventListener('click', function() {
+                if (!hasReferenceImage) {
+                    alert("Avval referens rasmni yuklang!");
+                    return;
+                }
+                
+                const context = canvas.getContext('2d');
+                canvas.width = video.videoWidth;
+                canvas.height = video.videoHeight;
+                context.drawImage(video, 0, 0, canvas.width, canvas.height);
+                
+                capturedImage.src = canvas.toDataURL('image/png');
+                capturedImageContainer.style.display = 'flex';
+                compareBtn.style.display = 'inline-block';
+                hasCapturedImage = true;
+            });
+            
+            // Yuzlarni taqqoslash
+            compareBtn.addEventListener('click', function() {
+                if (!hasReferenceImage || !hasCapturedImage) {
+                    alert("Avval ikkala rasmni ham tayyorlang!");
+                    return;
+                }
+                
+                // Natijani yashirish
+                result.style.display = 'none';
+                
+                // Yuklanayotganini ko'rsatish
+                loader.style.display = 'block';
+                
+                // Taqqoslash jarayonini simulyatsiya qilish (aslida Face ID API orqali)
+                setTimeout(function() {
+                    loader.style.display = 'none';
+                    
+                    // Tasodifiy natija (aslida Face ID algoritmi natijasi)
+                    const isMatch = Math.random() > 0.5;
+                    
+                    if (isMatch) {
+                        result.className = 'result success';
+                        result.textContent = '✅ Yashil to\'g\'ri! Yuzlar bir xil.';
+                    } else {
+                        result.className = 'result error';
+                        result.textContent = '❌ Yuzlar bir-biriga mos kelmadi!';
+                    }
+                    
+                    result.style.display = 'block';
+                }, 2000);
+            });
+        });
+    </script>
+</body>
+</html>
